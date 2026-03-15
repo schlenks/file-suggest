@@ -100,5 +100,12 @@ fn insert_metadata(
         [&now.to_string()],
     )?;
 
+    if let Some(hash) = git::get_head_hash(project_dir) {
+        conn.execute(
+            "INSERT INTO metadata VALUES ('head_hash', ?1)",
+            [&hash],
+        )?;
+    }
+
     Ok(())
 }

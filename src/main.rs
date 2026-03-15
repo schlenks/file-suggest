@@ -1,4 +1,4 @@
-use file_suggest::{index, project, search};
+use file_suggest::{incremental, index, project, search};
 use serde::Deserialize;
 use std::io::Read;
 use std::path::PathBuf;
@@ -49,9 +49,26 @@ fn cmd_search() {
     }
 }
 
-fn cmd_build(dir: Option<&str>) {
+fn cmd_build(args: &[String]) {
+    let full = args.iter().any(|a| a == "--full");
+    let dir = args.iter().find(|a| !a.starts_with('-'));
     let project = dir.map(PathBuf::from).unwrap_or_else(project_dir);
     let db = db_path();
+
+    if !full {
+        match incremental::incremental_build(&project, &db) {
+            Ok(Some(count)) => {
+                eprintln!("Incremental update: {count} files changed");
+                return;
+            }
+            Ok(None) => {
+                eprintln!("Falling back to full rebuild");
+            }
+            Err(e) => {
+                eprintln!("Incremental failed ({e}), falling back to full rebuild");
+            }
+        }
+    }
 
     match index::build(&project, &db) {
         Ok(count) => eprintln!("Indexed {count} files from {}", project.display()),
@@ -75,8 +92,8 @@ fn cmd_init() {
 
     install_hooks(&hooks_dir, &binary, &project);
 
-    // Build initial index
-    cmd_build(None);
+    // Build initial index (full build)
+    cmd_build(&["--full".to_string()]);
     eprintln!("\nDone! Add to ~/.claude/settings.json:");
     eprintln!(
         "  \"fileSuggestion\": {{\"type\": \"command\", \"command\": \"{}\"}}",
@@ -131,7 +148,8 @@ fn print_help() {
 
 USAGE:
   file-suggest              Read JSON from stdin, output file paths (fileSuggestion mode)
-  file-suggest build [dir]  Build/rebuild the FTS5 index
+  file-suggest build [dir]  Incremental index update (default)
+  file-suggest build --full [dir]  Full rebuild of the FTS5 index
   file-suggest init         Install git hooks and configure for current project
 
 ENVIRONMENT:
@@ -143,7 +161,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     match args.get(1).map(|s| s.as_str()) {
-        Some("build") => cmd_build(args.get(2).map(|s| s.as_str())),
+        Some("build") => cmd_build(&args[2..]),
         Some("init") => cmd_init(),
         Some("--help" | "-h") => print_help(),
         _ => cmd_search(),

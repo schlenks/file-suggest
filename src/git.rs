@@ -82,3 +82,56 @@ pub fn get_frecency(project_dir: &Path) -> HashMap<String, f64> {
 
     scores
 }
+
+/// Get files added/removed since a given commit hash.
+pub fn get_changed_files(project_dir: &Path, since_hash: &str) -> (Vec<String>, Vec<String>) {
+    let output = Command::new("git")
+        .args(["diff", "--name-status", since_hash, "HEAD"])
+        .current_dir(project_dir)
+        .output();
+
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+
+    if let Ok(output) = output {
+        if !output.status.success() {
+            return (added, removed);
+        }
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() < 2 {
+                continue;
+            }
+            let status = parts[0].chars().next().unwrap_or(' ');
+            match status {
+                'A' | 'C' => added.push(parts[1].to_string()),
+                'D' => removed.push(parts[1].to_string()),
+                'M' => added.push(parts[1].to_string()),
+                'R' => {
+                    removed.push(parts[1].to_string());
+                    if parts.len() >= 3 {
+                        added.push(parts[2].to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    (added, removed)
+}
+
+/// Get the current HEAD commit hash.
+pub fn get_head_hash(project_dir: &Path) -> Option<String> {
+    Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(project_dir)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if !o.status.success() {
+                return None;
+            }
+            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if s.is_empty() { None } else { Some(s) }
+        })
+}
