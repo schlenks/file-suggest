@@ -47,7 +47,7 @@ fn dockerfile_has_penalty() {
 fn ide_config_has_high_penalty() {
     let vscode = file_suggest::scoring::type_penalty(".vscode/settings.json");
     assert!(vscode > 0.0);
-    let test = file_suggest::scoring::type_penalty("src/test.ts");
+    let test = file_suggest::scoring::type_penalty("src/Button.test.ts");
     assert!(vscode > test);
 }
 
@@ -55,7 +55,7 @@ fn ide_config_has_high_penalty() {
 fn lockfile_has_high_penalty() {
     let lockfile = file_suggest::scoring::type_penalty("pnpm-lock.yaml");
     assert!(lockfile > 0.0);
-    let test = file_suggest::scoring::type_penalty("src/test.ts");
+    let test = file_suggest::scoring::type_penalty("src/Button.test.ts");
     assert!(lockfile > test);
 }
 

@@ -65,7 +65,7 @@ fn is_dot_config(lower: &str) -> bool {
 
 /// Returns true if the path is a migration file.
 fn is_migration(lower: &str) -> bool {
-    lower.contains("/migrations/")
+    lower.starts_with("migrations/") || lower.contains("/migrations/")
 }
 
 /// Returns true if the path is a type declaration file.
