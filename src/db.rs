@@ -30,6 +30,13 @@ pub fn create_schema(conn: &Connection) -> Result<()> {
             type_penalty REAL DEFAULT 0.0
         );
 
+        DROP TABLE IF EXISTS files_trigram;
+        CREATE VIRTUAL TABLE files_trigram USING fts5(
+            path,
+            tokenize='trigram',
+            detail=none
+        );
+
         DROP TABLE IF EXISTS metadata;
         CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT);
         ",

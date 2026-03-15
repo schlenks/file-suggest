@@ -21,6 +21,11 @@ pub fn search(query: &str, db_path: &Path) -> rusqlite::Result<Vec<String>> {
         return Ok(results);
     }
 
+    let results = search_trigram(&conn, query)?;
+    if !results.is_empty() {
+        return Ok(results);
+    }
+
     search_like_fallback(&conn, query)
 }
 
@@ -65,6 +70,24 @@ fn search_fts(conn: &rusqlite::Connection, query: &str) -> rusqlite::Result<Vec<
          LIMIT {MAX_RESULTS}"
     );
 
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+    rows.collect()
+}
+
+/// Trigram substring search for queries like "config" matching "tsconfig.json".
+fn search_trigram(conn: &rusqlite::Connection, query: &str) -> rusqlite::Result<Vec<String>> {
+    if query.len() < 3 {
+        return Ok(vec![]);
+    }
+    let escaped = query.replace('\'', "''").replace('"', "");
+    let sql = format!(
+        "SELECT t.path FROM files_trigram t
+         JOIN file_scores s ON t.path = s.path
+         WHERE files_trigram MATCH '\"{escaped}\"'
+         ORDER BY bm25(files_trigram) + (s.type_penalty * 0.5) + (length(t.path) * 0.001)
+         LIMIT {MAX_RESULTS}"
+    );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([], |row| row.get(0))?;
     rows.collect()

@@ -58,6 +58,7 @@ fn insert_files(
         let mut score_stmt = tx.prepare(
             "INSERT INTO file_scores (path, frecency, depth, type_penalty) VALUES (?1, ?2, ?3, ?4)",
         )?;
+        let mut tri_stmt = tx.prepare("INSERT INTO files_trigram (path) VALUES (?1)")?;
 
         for file in files {
             let filename = extract_filename(file);
@@ -68,6 +69,7 @@ fn insert_files(
 
             fts_stmt.execute(rusqlite::params![file, filename, tokens])?;
             score_stmt.execute(rusqlite::params![file, norm_frecency, depth, penalty])?;
+            tri_stmt.execute(rusqlite::params![file])?;
         }
     }
 
