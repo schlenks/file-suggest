@@ -1,8 +1,4 @@
-mod db;
-mod git;
-mod index;
-mod search;
-
+use file_suggest::{index, search};
 use serde::Deserialize;
 use std::io::Read;
 use std::path::PathBuf;
