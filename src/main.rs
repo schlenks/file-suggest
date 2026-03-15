@@ -90,6 +90,7 @@ fn cmd_init() {
 
     let binary = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("file-suggest"));
 
+    project::ensure_db_dir();
     install_hooks(&hooks_dir, &binary, &project);
 
     // Build initial index (full build)
@@ -101,12 +102,9 @@ fn cmd_init() {
     );
 }
 
-fn install_hooks(hooks_dir: &PathBuf, binary: &PathBuf, project: &PathBuf) {
-    let hook_body = format!(
-        "\"{}\" build \"{}\" &\n",
-        binary.display(),
-        project.display()
-    );
+fn install_hooks(hooks_dir: &PathBuf, binary: &PathBuf, _project: &PathBuf) {
+    // Hooks use incremental build by default (uses CLAUDE_PROJECT_DIR)
+    let hook_body = format!("\"{}\" build &\n", binary.display());
     let marker = "# file-suggest index rebuild";
 
     for hook_name in &["post-checkout", "post-merge", "post-commit", "post-rewrite"] {
