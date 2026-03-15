@@ -1,4 +1,4 @@
-use crate::db;
+use crate::{db, fuzzy};
 use rusqlite::params;
 use std::path::Path;
 
@@ -21,12 +21,22 @@ pub fn search(query: &str, db_path: &Path) -> rusqlite::Result<Vec<String>> {
         return Ok(results);
     }
 
-    let results = search_trigram(&conn, query)?;
+    // Trigram may fail for some queries (phrase limitations with detail=none).
+    // Treat errors as empty results and continue to next fallback.
+    if let Ok(results) = search_trigram(&conn, query) {
+        if !results.is_empty() {
+            return Ok(results);
+        }
+    }
+
+    let results = search_like_fallback(&conn, query)?;
     if !results.is_empty() {
         return Ok(results);
     }
 
-    search_like_fallback(&conn, query)
+    // Last resort: fuzzy match over all file paths
+    let all_paths = load_all_paths(&conn)?;
+    Ok(fuzzy::fuzzy_search(query, &all_paths, MAX_RESULTS))
 }
 
 /// Empty query: return files sorted by frecency (most recently edited first).
@@ -81,11 +91,13 @@ fn search_trigram(conn: &rusqlite::Connection, query: &str) -> rusqlite::Result<
         return Ok(vec![]);
     }
     let escaped = query.replace('\'', "''").replace('"', "");
+    // No phrase quotes — detail=none doesn't support phrase queries.
+    // Unquoted trigram queries check that all query trigrams appear in the path.
     let sql = format!(
         "SELECT t.path FROM files_trigram t
          JOIN file_scores s ON t.path = s.path
-         WHERE files_trigram MATCH '\"{escaped}\"'
-         ORDER BY bm25(files_trigram) + (s.type_penalty * 0.5) + (length(t.path) * 0.001)
+         WHERE files_trigram MATCH '{escaped}'
+         ORDER BY (s.type_penalty * 0.5) + (length(t.path) * 0.001)
          LIMIT {MAX_RESULTS}"
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -107,6 +119,13 @@ fn search_like_fallback(
          LIMIT ?2",
     )?;
     let rows = stmt.query_map(params![pattern, MAX_RESULTS as i64], |row| row.get(0))?;
+    rows.collect()
+}
+
+/// Load all file paths from the DB for fuzzy matching.
+fn load_all_paths(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare("SELECT path FROM file_scores")?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
     rows.collect()
 }
 

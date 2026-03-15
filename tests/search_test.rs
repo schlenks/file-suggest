@@ -68,8 +68,20 @@ fn trigram_finds_substring_matches() {
 }
 
 #[test]
-fn fuzzy_finds_abbreviations() {
-    // fuzzy_search is a standalone function, test it directly
+fn fuzzy_finds_abbreviations_via_search_pipeline() {
+    // "bksvc" won't match FTS5, trigram, or LIKE — falls through to fuzzy
+    let (_tmp, db_path) = build_test_index(&[
+        ("apps/api/src/domain/booking/services/booking.service.ts", 0.0),
+        ("apps/api/src/domain/guide/services/guide.service.ts", 0.0),
+        ("packages/data/src/user/user.repository.ts", 0.0),
+    ]);
+    let results = search::search("bksvc", &db_path).unwrap();
+    assert!(!results.is_empty());
+    assert!(results[0].contains("booking"));
+}
+
+#[test]
+fn fuzzy_finds_abbreviations_directly() {
     let paths = vec![
         "apps/api/src/domain/booking/services/booking.service.ts".to_string(),
         "apps/api/src/domain/guide/services/guide.service.ts".to_string(),
