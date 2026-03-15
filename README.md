@@ -21,11 +21,12 @@ Tested on a 9,600-file TypeScript monorepo:
 1. **FTS5 search** with BM25 ranking and 10x filename boost
 2. **Trigram index** for substring matching (`config` finds `tsconfig.json`)
 3. **Fuzzy matching** for abbreviations (`bksvc` finds `booking.service.ts`)
-4. **File-type awareness** — test, generated, snapshot, and barrel files rank below source files
-5. **BM25-tiered frecency** — among equally-relevant results, recently edited files rank first
-6. **Multi-project** — per-project databases in `~/.claude/file-suggest/`, no cross-contamination
-7. **Incremental updates** — git diff-based delta updates (~3ms vs ~100ms full rebuild)
-8. **Self-healing** — rebuilds the index automatically if the database is missing
+4. **File-type awareness** — build outputs, IDE configs, lockfiles, tests, dockerfiles, snapshots, and more rank below source files
+5. **Directory-context boost** — queries matching `apps/X` or `packages/X` directory names boost files inside those directories
+6. **BM25-tiered frecency** — among equally-relevant results, recently edited files rank first
+7. **Multi-project** — per-project databases in `~/.claude/file-suggest/`, no cross-contamination
+8. **Incremental updates** — git diff-based delta updates (~3ms vs ~100ms full rebuild)
+9. **Self-healing** — rebuilds the index automatically if the database is missing
 
 ## Install
 
@@ -82,7 +83,7 @@ Queries go through these stages in order, returning at the first match:
 
 1. **Empty query** → frecency-sorted recent files
 2. **Path prefix** (contains `/`) → LIKE match sorted by frecency
-3. **FTS5** → BM25-ranked with file-type penalties and frecency tie-breaking
+3. **FTS5** → BM25-ranked with file-type penalties, directory-context boost, and frecency tie-breaking
 4. **Trigram** → substring matching for partial queries (min 3 chars)
 5. **LIKE fallback** → simple pattern matching
 6. **Fuzzy** → fzf-style scoring for abbreviations
@@ -95,10 +96,17 @@ Source files rank above auxiliary files with identical relevance:
 |------|---------|---------|
 | Source | 0.0 | `Button.tsx` |
 | Barrel/index | 0.1 | `index.ts` |
+| Dot config | 0.15 | `.eslintrc.json` |
 | Styled | 0.2 | `Button.styled.ts` |
+| Type declaration | 0.2 | `types.d.ts` |
+| Migration | 0.2 | `migrations/20240101-add-field.js` |
 | Stories | 0.3 | `Button.stories.tsx` |
+| Dockerfile | 0.4 | `Dockerfile.production` |
 | Test | 0.5 | `Button.test.tsx` |
 | Snapshot | 0.8 | `Button.test.tsx.snap` |
+| IDE config | 0.9 | `.idea/runConfigurations/*.xml` |
+| Lockfile | 0.9 | `pnpm-lock.yaml` |
+| Build output | 1.0 | `.next/server/pages/index.js` |
 | Generated | 1.0 | `generated/types.ts` |
 
 ## Requirements
