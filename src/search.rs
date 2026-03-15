@@ -55,11 +55,13 @@ fn search_fts(conn: &rusqlite::Connection, query: &str) -> rusqlite::Result<Vec<
     }
 
     // bm25 weights: path=1.0, filename=10.0, tokens=2.0
+    // type_penalty: test/generated/barrel files ranked lower
     // length tiebreaker: shorter paths slightly preferred
     let sql = format!(
         "SELECT f.path FROM files_fts f
+         JOIN file_scores s ON f.path = s.path
          WHERE files_fts MATCH '{fts_query}'
-         ORDER BY bm25(files_fts, 1.0, 10.0, 2.0) + (length(f.path) * 0.001)
+         ORDER BY bm25(files_fts, 1.0, 10.0, 2.0) + (s.type_penalty * 0.5) + (length(f.path) * 0.001)
          LIMIT {MAX_RESULTS}"
     );
 
