@@ -117,3 +117,31 @@ fn frecency_breaks_ties_in_fts() {
     // Higher frecency should rank first
     assert_eq!(results[0], "apps/api/src/utils/helper.ts");
 }
+
+#[test]
+fn directory_context_boosts_files_in_matching_dir() {
+    // "temporal-worker" query: files inside apps/temporal-worker/ should beat
+    // infra files (Dockerfile, IDE configs) that also mention temporal-worker
+    // but are not inside the temporal-worker app directory.
+    //
+    // Without directory boost, "docker/temporal-worker" (short path, high BM25)
+    // would rank above "apps/temporal-worker/src/workers/emailWorker.ts".
+    let (_tmp, db_path) = build_test_index(&[
+        // Short infra path — wins on BM25+length without directory boost
+        ("docker/temporal-worker", 0.0),
+        // App files — should win WITH directory boost
+        ("apps/temporal-worker/src/workers/emailWorker.ts", 0.0),
+        ("apps/temporal-worker/package.json", 0.0),
+        (".idea/runConfigurations/temporal_worker_dev.xml", 0.0),
+    ]);
+    let results = search::search("temporal-worker", &db_path).unwrap();
+    assert!(
+        !results.is_empty(),
+        "expected at least one result for 'temporal-worker'"
+    );
+    assert!(
+        results[0].starts_with("apps/temporal-worker/"),
+        "expected results[0] to be inside apps/temporal-worker/, got: {}",
+        results[0]
+    );
+}
