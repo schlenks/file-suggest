@@ -1,6 +1,6 @@
 [package]
 name = "file-suggest"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Fast file suggestion for Claude Code with FTS5 + frecency ranking"
 license = "MIT"
