@@ -1,4 +1,4 @@
-use file_suggest::{index, search};
+use file_suggest::{index, project, search};
 use serde::Deserialize;
 use std::io::Read;
 use std::path::PathBuf;
@@ -10,8 +10,8 @@ struct QueryInput {
 }
 
 fn db_path() -> PathBuf {
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
-    home.join(".claude").join("file-suggestion.db")
+    project::ensure_db_dir();
+    project::db_path_for(&project_dir())
 }
 
 fn project_dir() -> PathBuf {
