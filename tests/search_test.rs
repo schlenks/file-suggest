@@ -52,7 +52,7 @@ fn exact_filename_match_ranks_first() {
     ]);
     let results = search::search("tsconfig", &db_path).unwrap();
     assert!(!results.is_empty());
-    // Root tsconfig.json should rank high (shorter path)
+    // Directory boost elevates packages/tsconfig/ files, but at minimum a tsconfig-related file ranks first
     assert!(results[0].contains("tsconfig"));
 }
 
@@ -144,4 +144,16 @@ fn directory_context_boosts_files_in_matching_dir() {
         "expected results[0] to be inside apps/temporal-worker/, got: {}",
         results[0]
     );
+}
+
+#[test]
+fn directory_boost_works_for_packages() {
+    let (_tmp, db_path) = build_test_index(&[
+        ("scripts/data-export.sh", 0.0),
+        ("packages/data/src/user.repository.ts", 0.0),
+        ("packages/data/src/booking.repository.ts", 0.0),
+    ]);
+    let results = search::search("data", &db_path).unwrap();
+    assert!(!results.is_empty());
+    assert!(results[0].starts_with("packages/data/"));
 }
