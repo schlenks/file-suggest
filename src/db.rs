@@ -26,7 +26,8 @@ pub fn create_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE file_scores (
             path TEXT PRIMARY KEY,
             frecency REAL DEFAULT 0.0,
-            depth INTEGER DEFAULT 0
+            depth INTEGER DEFAULT 0,
+            type_penalty REAL DEFAULT 0.0
         );
 
         DROP TABLE IF EXISTS metadata;

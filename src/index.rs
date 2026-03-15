@@ -1,4 +1,4 @@
-use crate::{db, git};
+use crate::{db, git, scoring};
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::Path;
@@ -55,17 +55,19 @@ fn insert_files(
     {
         let mut fts_stmt =
             tx.prepare("INSERT INTO files_fts (path, filename, tokens) VALUES (?1, ?2, ?3)")?;
-        let mut score_stmt =
-            tx.prepare("INSERT INTO file_scores (path, frecency, depth) VALUES (?1, ?2, ?3)")?;
+        let mut score_stmt = tx.prepare(
+            "INSERT INTO file_scores (path, frecency, depth, type_penalty) VALUES (?1, ?2, ?3, ?4)",
+        )?;
 
         for file in files {
             let filename = extract_filename(file);
             let tokens = tokenize_path(file);
             let norm_frecency = frecency.get(file.as_str()).unwrap_or(&0.0) / max_frecency;
             let depth = file.matches('/').count() as i32;
+            let penalty = scoring::type_penalty(file);
 
             fts_stmt.execute(rusqlite::params![file, filename, tokens])?;
-            score_stmt.execute(rusqlite::params![file, norm_frecency, depth])?;
+            score_stmt.execute(rusqlite::params![file, norm_frecency, depth, penalty])?;
         }
     }
 
