@@ -66,7 +66,7 @@ fn search_fts(conn: &rusqlite::Connection, query: &str) -> rusqlite::Result<Vec<
         "SELECT f.path FROM files_fts f
          JOIN file_scores s ON f.path = s.path
          WHERE files_fts MATCH '{fts_query}'
-         ORDER BY bm25(files_fts, 1.0, 10.0, 2.0) + (s.type_penalty * 0.5) + (length(f.path) * 0.001)
+         ORDER BY ROUND(bm25(files_fts, 1.0, 10.0, 2.0) + (s.type_penalty * 0.5), 1) + (length(f.path) * 0.001) - (s.frecency * 0.1)
          LIMIT {MAX_RESULTS}"
     );
 
