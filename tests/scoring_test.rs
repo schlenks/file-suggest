@@ -36,3 +36,49 @@ fn stories_file_has_penalty() {
     let penalty = file_suggest::scoring::type_penalty("src/Button/Button.stories.tsx");
     assert!(penalty > 0.0);
 }
+
+#[test]
+fn dockerfile_has_penalty() {
+    let penalty = file_suggest::scoring::type_penalty("apps/api/Dockerfile");
+    assert!(penalty > 0.0);
+}
+
+#[test]
+fn ide_config_has_high_penalty() {
+    let vscode = file_suggest::scoring::type_penalty(".vscode/settings.json");
+    assert!(vscode > 0.0);
+    let test = file_suggest::scoring::type_penalty("src/test.ts");
+    assert!(vscode > test);
+}
+
+#[test]
+fn lockfile_has_high_penalty() {
+    let lockfile = file_suggest::scoring::type_penalty("pnpm-lock.yaml");
+    assert!(lockfile > 0.0);
+    let test = file_suggest::scoring::type_penalty("src/test.ts");
+    assert!(lockfile > test);
+}
+
+#[test]
+fn build_output_has_max_penalty() {
+    let build_output = file_suggest::scoring::type_penalty("dist/index.js");
+    assert_eq!(build_output, 1.0);
+}
+
+#[test]
+fn dot_config_has_small_penalty() {
+    let dot_config = file_suggest::scoring::type_penalty(".prettierrc");
+    assert!(dot_config > 0.0);
+}
+
+#[test]
+fn migration_has_penalty() {
+    let migration = file_suggest::scoring::type_penalty("migrations/migrations/2024-01-01-add-users.js");
+    assert!(migration > 0.0);
+}
+
+#[test]
+fn type_declaration_has_penalty() {
+    let type_decl = file_suggest::scoring::type_penalty("src/types.d.ts");
+    assert!(type_decl > 0.0);
+}
