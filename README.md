@@ -8,12 +8,12 @@ Replaces Claude Code's built-in `@` file autocomplete with a pre-built SQLite FT
 
 Tested on a 9,600-file TypeScript monorepo:
 
-| Metric | Default | file-suggest v2 | Improvement |
-|--------|---------|-----------------|-------------|
-| Speed (p50) | 55ms | 3.4ms | **16.1x faster** |
-| Speed (p95) | 70ms | 4.8ms | **14.6x faster** |
-| Top-1 accuracy | 40% | 80% | **2x better** |
-| Top-3 accuracy | 60% | 87% | **1.4x better** |
+| Metric | Default | file-suggest v2.1 | Improvement |
+|--------|---------|-------------------|-------------|
+| Speed (p50) | 55ms | 14.4ms | **3.8x faster** |
+| Speed (p95) | 70ms | 15.4ms | **4.5x faster** |
+| Top-1 accuracy | 40% | 100% | **2.5x better** |
+| Top-3 accuracy | 60% | 100% | **1.7x better** |
 | Reliability | 5/5 | 5/5 | - |
 
 ## How it works
