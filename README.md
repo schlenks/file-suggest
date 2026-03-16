@@ -31,35 +31,68 @@ Tested on a 9,600-file TypeScript monorepo (53 scored queries):
 11. **Incremental updates** — git diff-based delta updates (~3ms vs ~100ms full rebuild)
 12. **Self-healing** — rebuilds the index automatically if the database is missing
 
+## Quick Start
+
+```bash
+# 1. Install
+cargo install --git https://github.com/schlenks/file-suggest
+
+# 2. Initialize for your project (builds index + installs git hooks)
+cd /path/to/your/project
+file-suggest init
+
+# 3. Add to Claude Code settings (init prints this for you)
+#    Edit ~/.claude/settings.json and add:
+#    "fileSuggestion": {"type": "command", "command": "file-suggest"}
+```
+
+That's it. Start a new Claude Code session and file suggestions will use the FTS5 index.
+
 ## Install
 
-### From source
+### From source (requires Rust toolchain)
 
 ```bash
 cargo install --git https://github.com/schlenks/file-suggest
+```
+
+### Clone and build
+
+```bash
+git clone https://github.com/schlenks/file-suggest.git
+cd file-suggest
+cargo build --release
+# Binary is at target/release/file-suggest — copy or symlink to your PATH
 ```
 
 ### From releases
 
 Download the binary for your platform from [Releases](https://github.com/schlenks/file-suggest/releases).
 
-## Setup
+### Verify installation
 
 ```bash
-# Navigate to your project
-cd /path/to/your/project
+file-suggest --help
+```
 
-# Build initial index and install git hooks
+## Setup
+
+### 1. Initialize your project
+
+```bash
+cd /path/to/your/project
 file-suggest init
 ```
 
 This will:
+- Build the FTS5 + trigram index for your project (~100ms for 10k files)
+- Install git hooks (`post-checkout`, `post-merge`, `post-commit`, `post-rewrite`) for automatic incremental updates
 - Create a per-project database in `~/.claude/file-suggest/`
-- Build the FTS5 + trigram index for your project
-- Install git hooks (`post-checkout`, `post-merge`, `post-commit`, `post-rewrite`) for incremental updates
 - Print the settings.json config to add
 
-Then add to `~/.claude/settings.json`:
+### 2. Configure Claude Code
+
+Add to your **personal** Claude Code settings (`~/.claude/settings.json`):
 
 ```json
 {
@@ -69,6 +102,40 @@ Then add to `~/.claude/settings.json`:
   }
 }
 ```
+
+If you installed via clone/build and didn't add to PATH, use the full path:
+
+```json
+{
+  "fileSuggestion": {
+    "type": "command",
+    "command": "/path/to/file-suggest"
+  }
+}
+```
+
+### 3. Start using it
+
+Start a new Claude Code session in your project. The `@` file autocomplete and file suggestions now use the FTS5 index. No other changes needed.
+
+### Multiple projects
+
+Each project gets its own database. Run `file-suggest init` in each project directory. The `fileSuggestion` setting is global — the binary automatically selects the right database based on `CLAUDE_PROJECT_DIR` (set by Claude Code).
+
+### Keeping the index fresh
+
+Git hooks handle most updates automatically. To manually rebuild after large changes (e.g., switching branches with many new files):
+
+```bash
+file-suggest build --full /path/to/your/project
+```
+
+### Uninstall
+
+1. Remove the `fileSuggestion` block from `~/.claude/settings.json`
+2. Delete the database: `rm -rf ~/.claude/file-suggest/`
+3. Remove the `# file-suggest index rebuild` lines from `.git/hooks/post-*`
+4. Uninstall the binary: `cargo uninstall file-suggest` (or delete the binary)
 
 ## Commands
 
