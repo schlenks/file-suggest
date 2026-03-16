@@ -171,6 +171,15 @@ fn dir_matches_tokens(dir: &str, tokens: &[String]) -> bool {
     tokens.iter().any(|tok| dir_name.contains(tok.as_str()))
 }
 
+/// Split a query string into tokens on path/extension/word delimiters.
+fn split_query_tokens(query: &str) -> Vec<&str> {
+    query.split(is_query_delimiter).filter(|t| !t.is_empty()).collect()
+}
+
+fn is_query_delimiter(c: char) -> bool {
+    c == '/' || c == '.' || c == '_' || c == '-' || c.is_whitespace()
+}
+
 /// Find well-known directory prefixes (`apps/X/` or `packages/X/`) whose directory name
 /// contains any token from the query.
 ///
@@ -178,10 +187,9 @@ fn dir_matches_tokens(dir: &str, tokens: &[String]) -> bool {
 /// table scan of file_scores. This is semantically equivalent because the boost only
 /// reorders files already in the result set — dirs with no files in results are irrelevant.
 fn find_matching_dirs(results: &[String], query: &str) -> Vec<String> {
-    let tokens: Vec<String> = query
-        .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-' || c.is_whitespace())
-        .filter(|t| !t.is_empty())
-        .map(|t| t.to_lowercase())
+    let tokens: Vec<String> = split_query_tokens(query)
+        .into_iter()
+        .map(str::to_lowercase)
         .collect();
 
     if tokens.is_empty() {
@@ -234,9 +242,6 @@ fn apply_directory_boost(results: Vec<String>, matching_dirs: &[String]) -> Vec<
 /// existing order. The list is already truncated to MAX_RESULTS by apply_directory_boost,
 /// so no further truncation is needed here.
 fn apply_filename_boost(results: Vec<String>, query: &str) -> Vec<String> {
-    // Only apply when query contains a `.` — signals filename/extension intent.
-    // Without this guard, bare queries like `temporal-worker` would incorrectly boost
-    // `docker/temporal-worker` over directory-boosted `apps/temporal-worker/` files.
     if !query.contains('.') {
         return results;
     }
@@ -248,17 +253,13 @@ fn apply_filename_boost(results: Vec<String>, query: &str) -> Vec<String> {
             basename == query_lower || basename.starts_with(&format!("{}.", query_lower))
         });
     exact.append(&mut rest);
-    exact.truncate(MAX_RESULTS);
     exact
 }
 
 /// Build an FTS5 MATCH expression from a query string.
 /// `booking.service` → `"booking"* AND "service"*`
 fn build_fts_query(query: &str) -> String {
-    let tokens: Vec<&str> = query
-        .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-' || c.is_whitespace())
-        .filter(|t| !t.is_empty())
-        .collect();
+    let tokens = split_query_tokens(query);
 
     tokens
         .iter()
