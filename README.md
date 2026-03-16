@@ -186,6 +186,10 @@ Source files rank above auxiliary files with identical relevance:
 
 No runtime dependencies. The binary statically links SQLite with FTS5 support.
 
+## Acknowledgements
+
+Inspired by [File Suggestion Research](https://github.com/spences10/claude-code-toolkit/blob/main/docs/file-suggestion-research.md) from the Claude Code Toolkit project.
+
 ## License
 
 MIT
