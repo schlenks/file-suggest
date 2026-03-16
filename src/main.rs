@@ -53,7 +53,8 @@ fn cmd_build(args: &[String]) {
     let full = args.iter().any(|a| a == "--full");
     let dir = args.iter().find(|a| !a.starts_with('-'));
     let project = dir.map(PathBuf::from).unwrap_or_else(project_dir);
-    let db = db_path();
+    project::ensure_db_dir();
+    let db = project::db_path_for(&project);
 
     if !full {
         match incremental::incremental_build(&project, &db) {
