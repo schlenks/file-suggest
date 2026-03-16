@@ -157,3 +157,15 @@ fn directory_boost_works_for_packages() {
     assert!(!results.is_empty());
     assert!(results[0].starts_with("packages/data/"));
 }
+
+#[test]
+fn space_separated_query_finds_results() {
+    let (_tmp, db_path) = build_test_index(&[
+        ("apps/admin/jest.config.ts", 0.0),
+        ("apps/partners/jest.config.ts", 0.0),
+        ("apps/marketplace/jest.config.ts", 0.0),
+    ]);
+    let results = search::search("admin jest.config", &db_path).unwrap();
+    assert!(!results.is_empty(), "space-separated query should return results");
+    assert_eq!(results[0], "apps/admin/jest.config.ts");
+}

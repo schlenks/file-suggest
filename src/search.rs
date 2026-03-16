@@ -142,7 +142,7 @@ fn load_all_paths(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> 
 /// reorders files already in the result set — dirs with no files in results are irrelevant.
 fn find_matching_dirs(results: &[String], query: &str) -> Vec<String> {
     let tokens: Vec<String> = query
-        .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-')
+        .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-' || c.is_whitespace())
         .filter(|t| !t.is_empty())
         .map(|t| t.to_lowercase())
         .collect();
@@ -206,7 +206,7 @@ fn apply_directory_boost(results: Vec<String>, matching_dirs: &[String]) -> Vec<
 /// `booking.service` → `"booking"* AND "service"*`
 fn build_fts_query(query: &str) -> String {
     let tokens: Vec<&str> = query
-        .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-')
+        .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-' || c.is_whitespace())
         .filter(|t| !t.is_empty())
         .collect();
 
