@@ -54,6 +54,7 @@ fn search_empty(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
 }
 
 /// Path-prefix query: LIKE match sorted by frecency then path length.
+/// Promotes index files (index.ts, index.tsx, index.js) to the front.
 fn search_path_prefix(conn: &rusqlite::Connection, query: &str) -> rusqlite::Result<Vec<String>> {
     let pattern = format!("{}%", query.replace('\'', "''"));
     let mut stmt = conn.prepare(
@@ -63,8 +64,19 @@ fn search_path_prefix(conn: &rusqlite::Connection, query: &str) -> rusqlite::Res
          ORDER BY s.frecency DESC, length(f.path)
          LIMIT ?2",
     )?;
-    let rows = stmt.query_map(params![pattern, MAX_RESULTS as i64], |row| row.get(0))?;
-    rows.collect()
+    let mut results: Vec<String> = stmt.query_map(params![pattern, MAX_RESULTS as i64], |row| row.get(0))?
+        .collect::<Result<Vec<String>, _>>()?;
+
+    // Promote index files to the front
+    if let Some(pos) = results.iter().position(|p| {
+        let basename = p.rsplit('/').next().unwrap_or("");
+        basename == "index.ts" || basename == "index.tsx" || basename == "index.js"
+    }) {
+        let index_file = results.remove(pos);
+        results.insert(0, index_file);
+    }
+
+    Ok(results)
 }
 
 /// FTS5 search with BM25 ranking + filename boost + short-path tiebreaker.

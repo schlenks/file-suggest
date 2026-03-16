@@ -1,0 +1,8 @@
+test(search): add packages/ boost test and fix misleading comment
+
+- Add test_directory_boost_works_for_packages to verify packages/X/
+  directory boost SQL branch is tested (3/3 reviewers agreed this was
+  critical to add)
+- Update exact_filename_match_ranks_first comment to reflect that
+  directory boost may elevate packages/tsconfig/ files; test now only
+  asserts a tsconfig-related file ranks first (not specifically root)

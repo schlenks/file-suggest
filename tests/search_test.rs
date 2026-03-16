@@ -186,3 +186,19 @@ fn exact_filename_beats_stemmer_conflation() {
         results[0]
     );
 }
+
+#[test]
+fn path_prefix_promotes_index_file() {
+    let (_tmp, db_path) = build_test_index(&[
+        ("apps/api/src/resolvers/paypal.ts", 0.9),
+        ("apps/api/src/resolvers/booking.ts", 0.8),
+        ("apps/api/src/resolvers/index.ts", 0.1),
+    ]);
+    let results = search::search("apps/api/src/resolvers", &db_path).unwrap();
+    assert!(!results.is_empty());
+    assert!(
+        results[0].ends_with("index.ts"),
+        "index.ts should rank first for directory path query, got: {}",
+        results[0]
+    );
+}
