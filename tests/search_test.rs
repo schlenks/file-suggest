@@ -169,3 +169,20 @@ fn space_separated_query_finds_results() {
     assert!(!results.is_empty(), "space-separated query should return results");
     assert_eq!(results[0], "apps/admin/jest.config.ts");
 }
+
+#[test]
+fn exact_filename_beats_stemmer_conflation() {
+    let (_tmp, db_path) = build_test_index(&[
+        ("apps/api/src/middleware/sanitization.ts", 0.0),
+        ("apps/api/src/utils/sanitizeError.ts", 0.0),
+        ("apps/api/src/utils/sanitizers.ts", 0.0),
+        ("apps/api/src/utils/sanitizeInput.ts", 0.0),
+    ]);
+    let results = search::search("sanitization.ts", &db_path).unwrap();
+    assert!(!results.is_empty());
+    assert!(
+        results[0].ends_with("sanitization.ts"),
+        "exact filename should rank first, got: {}",
+        results[0]
+    );
+}

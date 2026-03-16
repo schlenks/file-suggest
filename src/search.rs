@@ -22,6 +22,7 @@ pub fn search(query: &str, db_path: &Path) -> rusqlite::Result<Vec<String>> {
     if !results.is_empty() {
         let matching_dirs = find_matching_dirs(&results, query);
         let boosted = apply_directory_boost(results, &matching_dirs);
+        let boosted = apply_filename_boost(boosted, query);
         return Ok(boosted);
     }
 
@@ -134,6 +135,30 @@ fn load_all_paths(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> 
     rows.collect()
 }
 
+/// Extract the `apps/X/` or `packages/X/` top-level directory prefix from a path,
+/// or `None` if the path doesn't start with either prefix.
+fn extract_top_level_dir(path: &str) -> Option<String> {
+    if let Some(rest) = path.strip_prefix("apps/") {
+        rest.find('/').map(|i| format!("apps/{}/", &rest[..i]))
+    } else if let Some(rest) = path.strip_prefix("packages/") {
+        rest.find('/').map(|i| format!("packages/{}/", &rest[..i]))
+    } else {
+        None
+    }
+}
+
+/// Return true if the final component of `dir` (e.g. `api` in `apps/api/`) contains
+/// at least one of the provided query tokens.
+fn dir_matches_tokens(dir: &str, tokens: &[String]) -> bool {
+    let dir_name = dir
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .to_lowercase();
+    tokens.iter().any(|tok| dir_name.contains(tok.as_str()))
+}
+
 /// Find well-known directory prefixes (`apps/X/` or `packages/X/`) whose directory name
 /// contains any token from the query.
 ///
@@ -151,33 +176,13 @@ fn find_matching_dirs(results: &[String], query: &str) -> Vec<String> {
         return vec![];
     }
 
-    // Extract distinct apps/X/ and packages/X/ prefixes from results.
     let mut dirs: Vec<String> = results
         .iter()
-        .filter_map(|path| {
-            if let Some(rest) = path.strip_prefix("apps/") {
-                rest.find('/').map(|i| format!("apps/{}/", &rest[..i]))
-            } else if let Some(rest) = path.strip_prefix("packages/") {
-                rest.find('/').map(|i| format!("packages/{}/", &rest[..i]))
-            } else {
-                None
-            }
-        })
+        .filter_map(|path| extract_top_level_dir(path))
         .collect();
     dirs.sort();
     dirs.dedup();
-
-    // Keep only dirs whose directory name matches at least one query token.
-    dirs.retain(|dir| {
-        let dir_name = dir
-            .trim_end_matches('/')
-            .rsplit('/')
-            .next()
-            .unwrap_or("")
-            .to_lowercase();
-        tokens.iter().any(|tok| dir_name.contains(tok.as_str()))
-    });
-
+    dirs.retain(|dir| dir_matches_tokens(dir, &tokens));
     dirs
 }
 
@@ -200,6 +205,39 @@ fn apply_directory_boost(results: Vec<String>, matching_dirs: &[String]) -> Vec<
     boosted.append(&mut rest);
     boosted.truncate(MAX_RESULTS);
     boosted
+}
+
+/// Re-rank results by boosting files whose basename exactly matches the query.
+///
+/// Only activates when the query contains a `.` — a signal of filename intent (e.g.
+/// `sanitization.ts`, `booking.service`). This prevents the boost from overriding the
+/// directory boost for bare directory-style queries like `temporal-worker`.
+///
+/// Handles queries with and without extensions:
+/// - `sanitization.ts` → exact match against basename `sanitization.ts`
+/// - `booking.service` → prefix match against `booking.service.ts` (basename starts with `booking.service.`)
+///
+/// Files with an exact or prefix-exact filename match are moved to the front of the list,
+/// preserving their relative order among themselves. Remaining files follow in their
+/// existing order. The list is already truncated to MAX_RESULTS by apply_directory_boost,
+/// so no further truncation is needed here.
+fn apply_filename_boost(results: Vec<String>, query: &str) -> Vec<String> {
+    // Only apply when query contains a `.` — signals filename/extension intent.
+    // Without this guard, bare queries like `temporal-worker` would incorrectly boost
+    // `docker/temporal-worker` over directory-boosted `apps/temporal-worker/` files.
+    if !query.contains('.') {
+        return results;
+    }
+
+    let query_lower = query.to_lowercase();
+    let (mut exact, mut rest): (Vec<String>, Vec<String>) =
+        results.into_iter().partition(|path| {
+            let basename = path.rsplit('/').next().unwrap_or(path).to_lowercase();
+            basename == query_lower || basename.starts_with(&format!("{}.", query_lower))
+        });
+    exact.append(&mut rest);
+    exact.truncate(MAX_RESULTS);
+    exact
 }
 
 /// Build an FTS5 MATCH expression from a query string.
