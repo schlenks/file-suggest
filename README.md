@@ -10,8 +10,8 @@ Tested on a 9,600-file TypeScript monorepo:
 
 | Metric | Default | file-suggest v2.1 | Improvement |
 |--------|---------|-------------------|-------------|
-| Speed (p50) | 55ms | 14.4ms | **3.8x faster** |
-| Speed (p95) | 70ms | 15.4ms | **4.5x faster** |
+| Speed (p50) | 55ms | 3.4ms | **16x faster** |
+| Speed (p95) | 70ms | 5.0ms | **14x faster** |
 | Top-1 accuracy | 40% | 100% | **2.5x better** |
 | Top-3 accuracy | 60% | 100% | **1.7x better** |
 | Reliability | 5/5 | 5/5 | - |
