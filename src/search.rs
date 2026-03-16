@@ -20,7 +20,7 @@ pub fn search(query: &str, db_path: &Path) -> rusqlite::Result<Vec<String>> {
 
     let results = search_fts(&conn, query)?;
     if !results.is_empty() {
-        let matching_dirs = find_matching_dirs(&conn, query)?;
+        let matching_dirs = find_matching_dirs(&results, query);
         let boosted = apply_directory_boost(results, &matching_dirs);
         return Ok(boosted);
     }
@@ -137,58 +137,48 @@ fn load_all_paths(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> 
 /// Find well-known directory prefixes (`apps/X/` or `packages/X/`) whose directory name
 /// contains any token from the query.
 ///
-/// Uses a subquery to avoid the SQLite limitation where a column alias defined in SELECT
-/// cannot be referenced in a WHERE clause at the same level.
-fn find_matching_dirs(
-    conn: &rusqlite::Connection,
-    query: &str,
-) -> rusqlite::Result<Vec<String>> {
-    let tokens: Vec<&str> = query
+/// Extracts directory prefixes from the FTS5 results we already have, avoiding a full
+/// table scan of file_scores. This is semantically equivalent because the boost only
+/// reorders files already in the result set — dirs with no files in results are irrelevant.
+fn find_matching_dirs(results: &[String], query: &str) -> Vec<String> {
+    let tokens: Vec<String> = query
         .split(|c: char| c == '/' || c == '.' || c == '_' || c == '-')
         .filter(|t| !t.is_empty())
+        .map(|t| t.to_lowercase())
         .collect();
 
     if tokens.is_empty() {
-        return Ok(vec![]);
+        return vec![];
     }
 
-    // Query distinct `apps/X/` and `packages/X/` prefixes from file_scores.
-    // The subquery extracts the root prefix so the outer WHERE can filter on it.
-    let sql = "
-        SELECT DISTINCT dir FROM (
-            SELECT
-                CASE
-                    WHEN path LIKE 'apps/%' THEN
-                        'apps/' || substr(path, 6, instr(substr(path, 6), '/') - 1) || '/'
-                    WHEN path LIKE 'packages/%' THEN
-                        'packages/' || substr(path, 10, instr(substr(path, 10), '/') - 1) || '/'
-                    ELSE NULL
-                END AS dir
-            FROM file_scores
-        )
-        WHERE dir IS NOT NULL AND dir != 'apps//' AND dir != 'packages//'
-    ";
-
-    let mut stmt = conn.prepare(sql)?;
-    let all_dirs: Vec<String> = stmt
-        .query_map([], |row| row.get(0))?
-        .collect::<rusqlite::Result<Vec<String>>>()?;
-
-    // Keep only dirs whose directory name (the X part) matches at least one query token.
-    let matching: Vec<String> = all_dirs
-        .into_iter()
-        .filter(|dir| {
-            // Extract X from "apps/X/" or "packages/X/"
-            let parts: Vec<&str> = dir.trim_end_matches('/').split('/').collect();
-            let dir_name = parts.last().unwrap_or(&"");
-            // The directory name must contain at least one query token (case-insensitive).
-            tokens.iter().any(|tok| {
-                dir_name.to_lowercase().contains(&tok.to_lowercase())
-            })
+    // Extract distinct apps/X/ and packages/X/ prefixes from results.
+    let mut dirs: Vec<String> = results
+        .iter()
+        .filter_map(|path| {
+            if let Some(rest) = path.strip_prefix("apps/") {
+                rest.find('/').map(|i| format!("apps/{}/", &rest[..i]))
+            } else if let Some(rest) = path.strip_prefix("packages/") {
+                rest.find('/').map(|i| format!("packages/{}/", &rest[..i]))
+            } else {
+                None
+            }
         })
         .collect();
+    dirs.sort();
+    dirs.dedup();
 
-    Ok(matching)
+    // Keep only dirs whose directory name matches at least one query token.
+    dirs.retain(|dir| {
+        let dir_name = dir
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or("")
+            .to_lowercase();
+        tokens.iter().any(|tok| dir_name.contains(tok.as_str()))
+    });
+
+    dirs
 }
 
 /// Re-rank results by boosting files that live inside a matching directory.
