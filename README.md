@@ -6,14 +6,14 @@ Replaces Claude Code's built-in `@` file autocomplete with a pre-built SQLite FT
 
 ## Benchmarks
 
-Tested on a 9,600-file TypeScript monorepo:
+Tested on a 9,600-file TypeScript monorepo (53 scored queries):
 
-| Metric | Default | file-suggest v2.1 | Improvement |
+| Metric | Default | file-suggest v2.2 | Improvement |
 |--------|---------|-------------------|-------------|
-| Speed (p50) | 55ms | 3.4ms | **16x faster** |
-| Speed (p95) | 70ms | 5.0ms | **14x faster** |
-| Top-1 accuracy | 40% | 100% | **2.5x better** |
-| Top-3 accuracy | 60% | 100% | **1.7x better** |
+| Speed (p50) | 55ms | 4.3ms | **13x faster** |
+| Speed (p95) | 70ms | 6.6ms | **11x faster** |
+| Top-1 accuracy | 40% | 94% | **2.4x better** |
+| Top-3 accuracy | 60% | 96% | **1.6x better** |
 | Reliability | 5/5 | 5/5 | - |
 
 ## How it works
@@ -23,10 +23,13 @@ Tested on a 9,600-file TypeScript monorepo:
 3. **Fuzzy matching** for abbreviations (`bksvc` finds `booking.service.ts`)
 4. **File-type awareness** — build outputs, IDE configs, lockfiles, tests, dockerfiles, snapshots, and more rank below source files
 5. **Directory-context boost** — queries matching `apps/X` or `packages/X` directory names boost files inside those directories
-6. **BM25-tiered frecency** — among equally-relevant results, recently edited files rank first
-7. **Multi-project** — per-project databases in `~/.claude/file-suggest/`, no cross-contamination
-8. **Incremental updates** — git diff-based delta updates (~3ms vs ~100ms full rebuild)
-9. **Self-healing** — rebuilds the index automatically if the database is missing
+6. **Filename match boost** — exact basename matches outrank stemmer-conflated results (e.g., `sanitization.ts` beats `sanitize.ts`)
+7. **Index file promotion** — path-prefix queries promote `index.ts`/`index.tsx`/`index.js` to the front
+8. **Space-separated queries** — `admin jest.config` finds `apps/admin/jest.config.ts`
+9. **BM25-tiered frecency** — among equally-relevant results, recently edited files rank first
+10. **Multi-project** — per-project databases in `~/.claude/file-suggest/`, no cross-contamination
+11. **Incremental updates** — git diff-based delta updates (~3ms vs ~100ms full rebuild)
+12. **Self-healing** — rebuilds the index automatically if the database is missing
 
 ## Install
 
@@ -82,8 +85,8 @@ file-suggest --help             # Show usage
 Queries go through these stages in order, returning at the first match:
 
 1. **Empty query** → frecency-sorted recent files
-2. **Path prefix** (contains `/`) → LIKE match sorted by frecency
-3. **FTS5** → BM25-ranked with file-type penalties, directory-context boost, and frecency tie-breaking
+2. **Path prefix** (contains `/`) → LIKE match sorted by frecency, index files promoted
+3. **FTS5** → BM25-ranked with file-type penalties, directory boost, filename boost, and frecency tie-breaking
 4. **Trigram** → substring matching for partial queries (min 3 chars)
 5. **LIKE fallback** → simple pattern matching
 6. **Fuzzy** → fzf-style scoring for abbreviations
